@@ -1,5 +1,6 @@
 ansible-lint
 ansible-lint-junit
+cryptography
 defusedxml
 dnspython
 docker
@@ -10,6 +11,7 @@ hvac
 netaddr
 passlib
 py
+pyopenssl
 pyVim
 pyVmomi
 pytest
