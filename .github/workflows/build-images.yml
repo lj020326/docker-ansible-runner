@@ -22,10 +22,13 @@ jobs:
 #      max-parallel: 2
       matrix:
         versions:
+          - { python: "3.13", ansible: 2.20, tag: "stable-2.20-py3.13" }
           - { python: "3.13", ansible: 2.19, tag: "stable-2.19-py3.13" }
+          - { python: "3.12", ansible: 2.20, tag: "stable-2.20-py3.12" }
+          - { python: "3.12", ansible: 2.19, tag: "stable-2.19-py3.12" }
+          - { python: "3.12", ansible: 2.16, tag: "stable-2.16-py3.12" }
           - { python: "3.11", ansible: 2.19, tag: "stable-2.19-py3.11" }
           - { python: "3.11", ansible: 2.18, tag: "stable-2.18-py3.11" }
-          - { python: "3.12", ansible: 2.16, tag: "stable-2.16-py3.12" }
           - { python: "3.10", ansible: 2.16, tag: "stable-2.16-py3.10" }
 #          - { python: "3.13", ansible: devel, tag: "devel-py3.13" }
 
@@ -48,7 +51,7 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
-      - name: Build and push ${{ env.DOCKER_IMAGE }}:${{ matrix.versions.ansible }}-py${{ matrix.versions.python }}
+      - name: Build and push ${{ env.DOCKER_IMAGE }}:${{ matrix.versions.tag }}
         uses: docker/build-push-action@v3
         with:
           context: image
