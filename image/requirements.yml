@@ -15,6 +15,8 @@ collections:
   - name: community.vmware
   - name: community.windows
 #  - name: community.postgresql
+
+  - name: containers.podman
   - name: vmware.vmware
 
   - name: chocolatey.chocolatey

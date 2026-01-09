@@ -120,7 +120,8 @@ RUN echo "Install ansible-core with ANSIBLE_CORE_VERSION: ${ANSIBLE_CORE_VERSION
 # Install ansible-core and ansible-test.
 # ansible-test is included as part of the ansible-core package.
 # Use the specified ANSIBLE_CORE_VERSION.
-RUN pip install --user --upgrade pip \
+#RUN pip install --user --upgrade pip \
+RUN pip install --disable-pip-version-check --upgrade pip \
     && case "${ANSIBLE_CORE_VERSION}" in \
         latest) \
             pip install "ansible-core"; \
@@ -147,12 +148,14 @@ RUN pip install --user --upgrade pip \
 #            set +x; \
             ;; \
     esac \
-    && pip install --user pytest flake8
+    && pip install --disable-pip-version-check pytest flake8
+#    && pip install --user pytest flake8
 
 COPY requirements.txt .
 COPY requirements.yml .
 
-RUN pip install --user -r requirements.txt
+#RUN pip install --user -r requirements.txt
+RUN pip install --disable-pip-version-check -r requirements.txt
 
 # Create the default Ansible collections directory to ensure
 # `ansible-galaxy collection list` can run without errors.
