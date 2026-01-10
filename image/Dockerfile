@@ -143,8 +143,8 @@ RUN pip install --disable-pip-version-check --upgrade pip \
                 exit 1; \
             fi; \
 #            set -x; \
-            python -m pip install " https://github.com/ansible/ansible/archive/stable-${ANSIBLE_CORE_VERSION}.tar.gz" --disable-pip-version-check --user; \
-#            pip install "ansible-core~=${ANSIBLE_CORE_VERSION}"; \
+#            python -m pip install " https://github.com/ansible/ansible/archive/stable-${ANSIBLE_CORE_VERSION}.tar.gz" --disable-pip-version-check --user; \
+            pip install "ansible-core~=${ANSIBLE_CORE_VERSION}"; \
 #            set +x; \
             ;; \
     esac \
