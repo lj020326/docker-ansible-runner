@@ -18,6 +18,7 @@ collections:
 
   - name: containers.podman
   - name: vmware.vmware
+  - name: microsoft.ad
 
   - name: chocolatey.chocolatey
 

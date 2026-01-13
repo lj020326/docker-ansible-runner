@@ -79,6 +79,8 @@ ENV LANG=en_US.UTF-8 \
 
 # --- Start Docker-in-Docker (DinD) support installation ---
 # Install Docker CLI to enable running docker commands inside this container.
+# This is crucial for scenarios like 'ansible-test units --docker' which
+# require interacting with a Docker daemon.
 RUN apt-get update \
     && install -m 0755 -d /etc/apt/keyrings \
     && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
