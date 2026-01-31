@@ -12,6 +12,7 @@ collections:
   - name: community.libvirt
   - name: community.molecule
   - name: community.mysql
+  - name: community.proxmox
   - name: community.vmware
   - name: community.windows
 #  - name: community.postgresql
@@ -32,7 +33,6 @@ collections:
   - name: sivel.toiletwater
 
   - name: ngine_io.cloudstack
-  - name: openvswitch.openvswitch
 #  - name: redhat.satellite
 
   - name: amazon.aws
