@@ -5,9 +5,45 @@
 # ARG instructions used in FROM must come before the FROM instruction
 ARG PYTHON_VERSION="3.12"
 
+# Stage 1: Extraction
+ARG UBUNTU_VERSION=24.04
+FROM ubuntu:${UBUNTU_VERSION} AS builder
+RUN apt-get update && apt-get install -y unzip tar
+
+ENV YQ_VERSION=v4.53.2
+ENV YQ_BINARY=yq_linux_amd64
+ARG GOVC_VERSION=v0.53.1
+ARG PACKER_VERSION=1.15.3
+
+# Copy all local files into the builder
+COPY files/${YQ_BINARY}_${YQ_VERSION}.tar.gz /tmp/
+COPY files/govc_${GOVC_VERSION}_linux_x86_64.tar.gz /tmp/
+COPY files/packer_${PACKER_VERSION}_linux_amd64.zip /tmp/
+
+# Extract YQ
+RUN mkdir -p /out/usr/local/bin && \
+    tar -xzf /tmp/${YQ_BINARY}_${YQ_VERSION}.tar.gz -C /out/usr/local/bin/ --wildcards "*${YQ_BINARY}*" && \
+    mv /out/usr/local/bin/${YQ_BINARY} /out/usr/local/bin/yq
+
+# Extract GOVC
+RUN tar -xzf /tmp/govc_${GOVC_VERSION}_linux_x86_64.tar.gz -C /out/usr/local/bin/ --wildcards "*govc*"
+
+# Extract Packer
+RUN unzip /tmp/packer_${PACKER_VERSION}_linux_amd64.zip packer -d /out/usr/local/bin/
+
+# Copy the retry script into the image
+COPY retry_command.sh /out/usr/local/bin/retry_command.sh
+
+# Make the script executable
+RUN chmod +x /out/usr/local/bin/retry_command.sh
+
+# Ensure everything is executable
+RUN chmod +x /out/usr/local/bin/*
+
 # Use a Python base image that matches the desired Python version
 # We use a slim Debian-based image for smaller size.
 FROM python:${PYTHON_VERSION}-slim-bullseye
+ARG PYTHON_VERSION="3.12"
 
 ARG ANSIBLE_CORE_VERSION="latest"
 
@@ -19,99 +55,97 @@ ARG BUILD_ID=devel
 LABEL build=$BUILD_ID
 
 # Set environment variables
-ENV DEBIAN_FRONTEND=noninteractive \
-    PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/ansible/bin" \
-    # Set PIP_NO_CACHE_DIR to prevent pip from caching packages inside the image
-    PIP_NO_CACHE_DIR=1
+ENV container=docker
+ENV DEBIAN_FRONTEND=noninteractive
 
+# Set PIP_NO_CACHE_DIR to prevent pip from caching packages inside the image
+ENV PIP_NO_CACHE_DIR=1
+
+ENV PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/ansible/bin"
 ENV PATH="/root/.local/bin:${PATH}"
 
-## ref: https://github.com/pypa/pip/issues/11179#issuecomment-1152766374
-ENV PIP_ROOT_USER_ACTION=ignore
-
-## https://github.com/mikefarah/yq#install
-ENV YQ_VERSION=v4.2.0
-ENV YQ_BINARY=yq_linux_amd64
+## ref: https://octopus.com/blog/using-ubuntu-docker-image
+RUN echo 'APT::Install-Suggests "0";' >> /etc/apt/apt.conf.d/00-docker
+RUN echo 'APT::Install-Recommends "0";' >> /etc/apt/apt.conf.d/00-docker
 
 # Update package lists and install necessary build tools and common dependencies.
 # These are essential for compiling some Python packages and for general test execution.
 # Add any other system-level dependencies your specific Ansible collections might require.
 # For example, if your collections interact with AWS, Azure, databases, etc., you might need:
 # apt-get install -y --no-install-recommends libssl-dev libffi-dev openssh-client
-RUN apt-get update \
-    && apt-get install -y apt-utils \
-    && apt-get install -y --no-install-recommends \
-        build-essential \
-        ca-certificates \
-        bash \
-        git \
-        curl \
-        wget \
-        tree \
-        jq \
-        ssh-client \
-        shellcheck \
-        locales \
-        # Docker-in-docker dependencies
-        gnupg \
-        dirmngr \
-        sshpass \
-        # Common libraries for Python modules (e.g., for cryptography, database connectors)
-        libpq-dev \
-        # libmysqlclient-dev \
-        libmariadb-dev \
-        # python-ldap dependencies
-        build-essential \
-        libsasl2-dev \
-        libldap2-dev \
-        libssl-dev \
-    # Add more if needed, e.g., python3-dev for some native extensions
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+
+## 1. Core System Utilities & Locales
+# These rarely change and provide the base for everything else
+RUN apt-get update -qqy && \
+    apt-get -qqy --no-install-recommends install \
+      apt-transport-https apt-utils locales ca-certificates \
+      software-properties-common bash tar zip unzip gnupg \
+      netbase tzdata curl wget git git-lfs tree less nano jq rsync && \
+    sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
+    locale-gen && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+## 2. Networking & Debugging Tools
+RUN apt-get update -qqy && \
+    apt-get -qqy --no-install-recommends install \
+      dnsutils iproute2 openssh-client iputils-ping \
+      inetutils-telnet ssh-askpass sshpass ssh-client shellcheck \
+      groff rlwrap && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+## 3. Build Tools & Development Libraries
+# Essential for compiling Python C-extensions or local builds
+RUN apt-get update -qqy && \
+    apt-get -qqy --no-install-recommends install \
+      build-essential patch genisoimage dirmngr openssl \
+      zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev \
+      libpq-dev libmariadb-dev libsasl2-dev libldap2-dev \
+      libssl-dev libsqlite3-dev libreadline-dev libffi-dev \
+      libbz2-dev uuid-dev default-mysql-client && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Generate and set the locale
 RUN sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
     && locale-gen
 
-# Set environment variables for the locale
-ENV LANG=en_US.UTF-8 \
-    LC_ALL=en_US.UTF-8
+## Ensure the following are set after running `locale-gen`
+ENV LANGUAGE=en_US:en
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
 
+## 4. Docker CLI (DinD Support)
+# Kept separate so the Docker version can be updated independently
 # --- Start Docker-in-Docker (DinD) support installation ---
 # Install Docker CLI to enable running docker commands inside this container.
 # This is crucial for scenarios like 'ansible-test units --docker' which
 # require interacting with a Docker daemon.
-RUN apt-get update \
-    && install -m 0755 -d /etc/apt/keyrings \
-    && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
-    && chmod a+r /etc/apt/keyrings/docker.gpg \
-    && echo \
+# Modern Docker Repo Setup
+RUN install -m 0755 -d /etc/apt/keyrings && \
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
+    chmod a+r /etc/apt/keyrings/docker.gpg && \
+    echo \
         "deb [arch=\"$(dpkg --print-architecture)\" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
         $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | \
-        tee /etc/apt/sources.list.d/docker.list > /dev/null \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends docker-ce-cli **docker-compose-plugin** \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+        tee /etc/apt/sources.list.d/docker.list > /dev/null && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+      docker-ce-cli \
+      docker-compose-plugin \
+      docker-buildx-plugin && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 # --- End Docker-in-Docker (DinD) support installation ---
 
+# 5. External Tools: Copy in from builder stage ---
+# Copy the already-extracted binaries from the builder stage
+COPY --from=builder /out/usr/local/bin/ /usr/local/bin/
+
+#==========
+# PIP - Install Python dependencies
+#==========
+## ref: https://github.com/pypa/pip/issues/11179#issuecomment-1152766374
+ENV PIP_ROOT_USER_ACTION=ignore
+
 RUN python -m pip install --upgrade pip
-
-## 'yq' required for ansible inventory tests
-## ref: https://github.com/mikefarah/yq#install
-## ref: https://askubuntu.com/questions/72663/how-to-make-wget-retry-download-if-speed-goes-below-certain-threshold
-#RUN wget -q https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq &&\
-#    chmod +x /usr/local/bin/yq
-#RUN wget -q https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/${YQ_BINARY}.tar.gz -O - |\
-#  tar xz && mv ${YQ_BINARY} /usr/local/bin/yq
-RUN wget -c --tries=5 --read-timeout=5 -q https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/${YQ_BINARY}.tar.gz -O - |\
-  tar xz && mv ${YQ_BINARY} /usr/local/bin/yq
-
-# Copy the retry script into the image
-COPY retry_command.sh /usr/local/bin/retry_command.sh
-
-# Make the script executable
-RUN chmod +x /usr/local/bin/retry_command.sh
 
 # Set the working user for the rest of the build and runtime to 'root'
 # as your desired UID is 0.
@@ -159,9 +193,38 @@ RUN pip install --disable-pip-version-check --upgrade pip \
 
 COPY requirements.txt .
 COPY requirements.yml .
+COPY files/vsphere_automation_sdk-8.0.3.0.tar.gz /var/tmp/vsphere_automation_sdk.tar.gz
 
 #RUN pip install --user -r requirements.txt
 RUN pip install --disable-pip-version-check -r requirements.txt
+
+## 2. Extract and install components manually from the local source
+#RUN mkdir -p /tmp/sdk-build && \
+#    tar -xzf /var/tmp/vsphere_automation_sdk.tar.gz -C /tmp/sdk-build --strip-components=1 && \
+#    cd /tmp/sdk-build && \
+#    # Install the specific internal requirements first
+#    pip install --no-cache-dir -r requirements.txt && \
+#    # Install the SDK itself in editable mode or direct install
+#    pip install --no-cache-dir . && \
+#    cd / && \
+#    rm -rf /tmp/sdk-build
+
+RUN mkdir -p /tmp/sdk-build && \
+    tar -xzf /var/tmp/vsphere_automation_sdk.tar.gz -C /tmp/sdk-build --strip-components=1 && \
+    # Force an older setuptools version that includes pkg_resources
+    pip install --no-cache-dir "setuptools<70.0.0" && \
+    pip install --no-cache-dir lxml>=4.3.0 six>=1.12 requests>=2.27.1 pyOpenSSL>=22.0.0 cryptography>=37.0.2 && \
+    pip install --no-cache-dir \
+        $(find /tmp/sdk-build/lib/vmwarecloud-aws -name "*.whl") \
+        $(find /tmp/sdk-build/lib/vmwarecloud-draas -name "*.whl") \
+        $(find /tmp/sdk-build/lib/nsx-python-sdk -name "*.whl") \
+        $(find /tmp/sdk-build/lib/nsx-policy-python-sdk -name "*.whl") \
+        $(find /tmp/sdk-build/lib/nsx-vmc-aws-integration-python-sdk -name "*.whl") \
+        $(find /tmp/sdk-build/lib/nsx-vmc-policy-python-sdk -name "*.whl") && \
+    cd /tmp/sdk-build && \
+    pip install --no-cache-dir . && \
+    cd / && \
+    rm -rf /tmp/sdk-build
 
 # Create the default Ansible collections directory to ensure
 # `ansible-galaxy collection list` can run without errors.
