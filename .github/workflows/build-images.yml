@@ -27,11 +27,12 @@ jobs:
 #      max-parallel: 2
       matrix:
         versions:
-#          - { python: "3.14", ansible: "2.20", tag: "stable-2.20-py3.13" }
-#          - { python: "3.14", ansible: "2.19", tag: "stable-2.19-py3.13" }
+          - { python: "3.14", ansible: "2.21", tag: "stable-2.21-py3.14" }
+          - { python: "3.14", ansible: "2.20", tag: "stable-2.20-py3.14" }
+#          - { python: "3.14", ansible: "2.19", tag: "stable-2.19-py3.14" }
+#          - { python: "3.14", ansible: "devel", tag: "devel-py3.14" }
           - { python: "3.13", ansible: "2.20", tag: "stable-2.20-py3.13" }
           - { python: "3.13", ansible: "2.19", tag: "stable-2.19-py3.13" }
-#          - { python: "3.13", ansible: "devel", tag: "devel-py3.13" }
           - { python: "3.12", ansible: "2.20", tag: "stable-2.20-py3.12" }
           - { python: "3.12", ansible: "2.19", tag: "stable-2.19-py3.12" }
           - { python: "3.12", ansible: "2.16", tag: "stable-2.16-py3.12" }
@@ -44,11 +45,11 @@ jobs:
         uses: ahmadnassri/action-workflow-queue@v1
 
       - name: Check out the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # === DOCKER BUILD SETUP PHASE ===
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3.7.0
+        uses: docker/setup-qemu-action@v4
         with:
           platforms: ${{ steps.git.outputs.platforms }}
 
@@ -78,16 +79,16 @@ jobs:
           echo "tags=$TAGS" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3.12.0
+        uses: docker/setup-buildx-action@v4
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
       - name: Build and push ${{ env.DOCKER_IMAGE }}:${{ matrix.versions.tag }}
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: image
           file: image/Dockerfile

@@ -55,3 +55,16 @@ $ docker run -it -p 8080:8080 -p 50000:50000 \
 ## Contact
 
 [![Linkedin](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/leejjohnson/)
+
+## Reference
+
+* https://github.com/jenkinsci/docker-agent/blob/master/17/bullseye/Dockerfile
+* https://github.com/jenkinsci/docker/blob/master/Dockerfile
+* https://github.com/cyrille-leclerc/java-build-tools-dockerfile
+* https://github.com/dettonville/java-build-tools-dockerfile
+* https://github.com/getintodevops/jenkins-withdocker (miiro@getintodevops.com)
+* https://github.com/cloudbees/jnlp-slave-with-java-build-tools-dockerfile
+* https://github.com/cloudbees/java-build-tools-dockerfile/blob/master/Dockerfile
+* https://github.com/SeleniumHQ/docker-selenium/blob/master/Base/Dockerfile
+* https://github.com/bibinwilson/jenkins-docker-slave
+* https://medium.com/@prashant.vats/jenkins-master-and-slave-with-docker-b993dd031cbd

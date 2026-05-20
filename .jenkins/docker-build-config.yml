@@ -9,34 +9,34 @@ buildArgs:
   IMAGE_REGISTRY: media.johnson.int:5000
 
 buildImageList:
-  ## python: 3.10
-  - buildArgs:
-      ANSIBLE_CORE_VERSION: "2.16"
-      PYTHON_VERSION: "3.10"
-    buildTags:
-      - stable-2.16-py3.10
-  - buildArgs:
-      ANSIBLE_CORE_VERSION: "latest"
-      PYTHON_VERSION: "3.10"
-    buildTags:
-      - latest-py3.10
-
-  ## python: 3.11
-  - buildArgs:
-      ANSIBLE_CORE_VERSION: "2.16"
-      PYTHON_VERSION: "3.11"
-    buildTags:
-      - stable-2.16-py3.11
-  - buildArgs:
-      ANSIBLE_CORE_VERSION: "2.18"
-      PYTHON_VERSION: "3.11"
-    buildTags:
-      - stable-2.18-py3.11
-  - buildArgs:
-      ANSIBLE_CORE_VERSION: "2.19"
-      PYTHON_VERSION: "3.11"
-    buildTags:
-      - stable-2.19-py3.11
+#  ## python: 3.10
+#  - buildArgs:
+#      ANSIBLE_CORE_VERSION: "2.16"
+#      PYTHON_VERSION: "3.10"
+#    buildTags:
+#      - stable-2.16-py3.10
+#  - buildArgs:
+#      ANSIBLE_CORE_VERSION: "latest"
+#      PYTHON_VERSION: "3.10"
+#    buildTags:
+#      - latest-py3.10
+#
+#  ## python: 3.11
+#  - buildArgs:
+#      ANSIBLE_CORE_VERSION: "2.16"
+#      PYTHON_VERSION: "3.11"
+#    buildTags:
+#      - stable-2.16-py3.11
+#  - buildArgs:
+#      ANSIBLE_CORE_VERSION: "2.18"
+#      PYTHON_VERSION: "3.11"
+#    buildTags:
+#      - stable-2.18-py3.11
+#  - buildArgs:
+#      ANSIBLE_CORE_VERSION: "2.19"
+#      PYTHON_VERSION: "3.11"
+#    buildTags:
+#      - stable-2.19-py3.11
 
   ## python: 3.12
   - buildArgs:
@@ -55,6 +55,11 @@ buildImageList:
     buildTags:
       - stable-2.20-py3.12
   - buildArgs:
+      ANSIBLE_CORE_VERSION: "2.21"
+      PYTHON_VERSION: "3.12"
+    buildTags:
+      - stable-2.21-py3.12
+  - buildArgs:
       ANSIBLE_CORE_VERSION: "latest"
       PYTHON_VERSION: "3.12"
     buildTags:
@@ -72,24 +77,34 @@ buildImageList:
     buildTags:
       - stable-2.20-py3.13
   - buildArgs:
+      ANSIBLE_CORE_VERSION: "2.21"
+      PYTHON_VERSION: "3.13"
+    buildTags:
+      - stable-2.21-py3.13
+  - buildArgs:
       ANSIBLE_CORE_VERSION: "latest"
       PYTHON_VERSION: "3.13"
     buildTags:
       - latest-py3.13
 
-#  ## python: 3.14
+  ## python: 3.14
 #  - buildArgs:
 #      ANSIBLE_CORE_VERSION: "2.19"
 #      PYTHON_VERSION: "3.14"
 #    buildTags:
 #      - stable-2.19-py3.14
-#  - buildArgs:
-#      ANSIBLE_CORE_VERSION: "2.20"
-#      PYTHON_VERSION: "3.14"
-#    buildTags:
-#      - stable-2.20-py3.14
-#  - buildArgs:
-#      ANSIBLE_CORE_VERSION: "latest"
-#      PYTHON_VERSION: "3.14"
-#    buildTags:
-#      - latest-py3.14
+  - buildArgs:
+      ANSIBLE_CORE_VERSION: "2.20"
+      PYTHON_VERSION: "3.14"
+    buildTags:
+      - stable-2.20-py3.14
+  - buildArgs:
+      ANSIBLE_CORE_VERSION: "2.21"
+      PYTHON_VERSION: "3.14"
+    buildTags:
+      - stable-2.21-py3.14
+  - buildArgs:
+      ANSIBLE_CORE_VERSION: "latest"
+      PYTHON_VERSION: "3.14"
+    buildTags:
+      - latest-py3.14
