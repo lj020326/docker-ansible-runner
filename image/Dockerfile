@@ -2,19 +2,22 @@
 # This Dockerfile builds a custom ansible-runner container image.
 # It allows specifying Ansible core and Python versions via build arguments.
 
-# ARG instructions used in FROM must come before the FROM instruction
+#=============================================================================
+# 1. CORE BUILD CONFIGURATION
+#=============================================================================
 ARG PYTHON_VERSION="3.13"
 ARG DEBIAN_VERSION="bookworm"
 FROM python:${PYTHON_VERSION}-slim-${DEBIAN_VERSION} AS builder
-
-# Stage 1: Extraction
-RUN apt-get update && apt-get install -y unzip tar
+RUN apt-get update && apt-get install -y unzip tar curl --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV YQ_VERSION=v4.53.2
 ENV YQ_BINARY=yq_linux_amd64
 ARG GOVC_VERSION=v0.53.1
 ARG PACKER_VERSION=1.15.3
 ARG INCLUSIVITY_VERSION=0.19.0
+
+RUN mkdir -p /out/usr/local/bin
 
 # Copy all local files into the builder
 COPY files/${YQ_BINARY}_${YQ_VERSION}.tar.gz /tmp/
@@ -23,32 +26,26 @@ COPY files/packer_${PACKER_VERSION}_linux_amd64.zip /tmp/
 COPY files/inclusivity-${INCLUSIVITY_VERSION}-linux-amd64.tar.gz /tmp/
 
 # Extract YQ
-RUN mkdir -p /out/usr/local/bin && \
-    tar -xzf /tmp/${YQ_BINARY}_${YQ_VERSION}.tar.gz -C /out/usr/local/bin/ --wildcards "*${YQ_BINARY}*" && \
+RUN tar -xzf /tmp/${YQ_BINARY}_${YQ_VERSION}.tar.gz -C /out/usr/local/bin/ --wildcards "*${YQ_BINARY}*" && \
     mv /out/usr/local/bin/${YQ_BINARY} /out/usr/local/bin/yq
 
 # Extract GOVC
 RUN tar -xzf /tmp/govc_${GOVC_VERSION}_linux_x86_64.tar.gz -C /out/usr/local/bin/ --wildcards "*govc*"
 
-# Extract inclusivity
-RUN tar -xzf /tmp/inclusivity-${INCLUSIVITY_VERSION}-linux-amd64.tar.gz -C /out/usr/local/bin/ --wildcards "*inclusivity*"
-
 # Extract Packer
 RUN unzip /tmp/packer_${PACKER_VERSION}_linux_amd64.zip packer -d /out/usr/local/bin/
 
-# Copy the retry script into the image
+# Extract inclusivity
+RUN tar -xzf /tmp/inclusivity-${INCLUSIVITY_VERSION}-linux-amd64.tar.gz -C /out/usr/local/bin/ --wildcards "*inclusivity*"
+
+# Bring in external script foundations
 COPY retry_command.sh /out/usr/local/bin/retry_command.sh
-
-# Make the script executable
-RUN chmod +x /out/usr/local/bin/retry_command.sh
-
-# Ensure everything is executable
 RUN chmod +x /out/usr/local/bin/*
 
-# Use a Python base image that matches the desired Python version
-# We use a slim Debian-based image for smaller size.
+#=============================================================================
+# 3. CONSOLIDATED RUNTIME IMAGE
+#=============================================================================
 FROM python:${PYTHON_VERSION}-slim-${DEBIAN_VERSION}
-ARG PYTHON_VERSION
 
 ARG ANSIBLE_CORE_VERSION="latest"
 
@@ -60,12 +57,19 @@ ARG BUILD_ID=devel
 LABEL build=$BUILD_ID
 
 # Set environment variables
-ENV container=docker
-ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=Etc/UTC \
+    LANG=en_US.UTF-8 \
+    LANGUAGE=en_US:en \
+    LC_ALL=en_US.UTF-8 \
+    container=docker \
+    VIRTUAL_ENV=/opt/venv
 
-## ref: https://octopus.com/blog/using-ubuntu-docker-image
-RUN echo 'APT::Install-Suggests "0";' >> /etc/apt/apt.conf.d/00-docker
-RUN echo 'APT::Install-Recommends "0";' >> /etc/apt/apt.conf.d/00-docker
+# Inject performance path extensions
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
+
+# Standardize optimization configurations for APT packages
+RUN echo 'APT::Install-Suggests "0";\nAPT::Install-Recommends "0";' > /etc/apt/apt.conf.d/00-docker
 
 # Update package lists and install necessary build tools and common dependencies.
 # These are essential for compiling some Python packages and for general test execution.
@@ -82,22 +86,17 @@ RUN apt-get update -qqy && \
       curl wget git git-lfs \
       locales tzdata netbase \
       software-properties-common \
-      tree less nano jq rsync && \
-    sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
-    locale-gen && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-
-## 2. Networking & Debugging Tools
-RUN apt-get update -qqy && \
-    apt-get -qqy --no-install-recommends install \
+      tree less nano jq rsync \
       dnsutils iproute2 iputils-ping inetutils-telnet \
       openssh-client ssh-askpass sshpass \
       gpg gpg-agent gnupg2 \
       ldap-utils \
       shellcheck groff rlwrap && \
+    sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
+    locale-gen && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-## 3. Build Tools & Development Libraries
+## 2. Build Tools & Development Libraries
 # Essential for compiling Python C-extensions or local builds
 RUN apt-get update -qqy && \
     apt-get -qqy --no-install-recommends install \
@@ -109,15 +108,6 @@ RUN apt-get update -qqy && \
       libbz2-dev uuid-dev default-mysql-client && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Generate and set the locale
-RUN sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
-    && locale-gen
-
-## Ensure the following are set after running `locale-gen`
-ENV LANGUAGE=en_US:en
-ENV LANG=en_US.UTF-8
-ENV LC_ALL=en_US.UTF-8
-
 ## 4. Docker CLI (DinD Support)
 # Kept separate so the Docker version can be updated independently
 # --- Start Docker-in-Docker (DinD) support installation ---
@@ -127,21 +117,15 @@ ENV LC_ALL=en_US.UTF-8
 RUN install -m 0755 -d /etc/apt/keyrings && \
     curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
     chmod a+r /etc/apt/keyrings/docker.gpg && \
-    echo \
-        "deb [arch=\"$(dpkg --print-architecture)\" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
-        $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | \
-        tee /etc/apt/sources.list.d/docker.list > /dev/null && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-      docker-ce-cli \
-      docker-compose-plugin \
-      docker-buildx-plugin \
-      docker-model-plugin && \
+    echo "deb [arch=\"$(dpkg --print-architecture)\" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" > /etc/apt/sources.list.d/docker.list && \
+    \
+    apt-get update && apt-get install -y docker-ce-cli docker-compose-plugin docker-buildx-plugin docker-model-plugin && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 # --- End Docker-in-Docker (DinD) support installation ---
 
-# 5. External Tools: Copy in from builder stage ---
-# Copy the already-extracted binaries from the builder stage
+#=============================================================================
+# 4. RUNTIME DEPENDENCY INGESTION
+#=============================================================================
 COPY --from=builder /out/usr/local/bin/ /usr/local/bin/
 
 #==========
@@ -198,25 +182,28 @@ RUN pip install --disable-pip-version-check --upgrade pip \
     && pip install --disable-pip-version-check pytest flake8
 #    && pip install --user pytest flake8
 
-ARG VSPHERE_AUTOMATION_SDK_VERSION=8.0.3.0
-
 COPY requirements.txt .
 COPY requirements.yml .
+ARG VSPHERE_AUTOMATION_SDK_VERSION=8.0.3.0
 COPY files/vsphere_automation_sdk-${VSPHERE_AUTOMATION_SDK_VERSION}.tar.gz /var/tmp/vsphere_automation_sdk.tar.gz
 
-#RUN pip install --user -r requirements.txt
-RUN pip install --no-cache-dir --disable-pip-version-check -r requirements.txt
-
-# === VMware vSphere Automation SDK Installation ===
-RUN mkdir -p /tmp/sdk-build && \
+RUN pip install --no-cache-dir --disable-pip-version-check -r requirements.txt && \
+    mkdir -p /tmp/sdk-build && \
     tar -xzf /var/tmp/vsphere_automation_sdk.tar.gz -C /tmp/sdk-build --strip-components=1 && \
     cd /tmp/sdk-build && \
-    # Install the pre-built wheels directly (this bypasses the broken metadata)
-    pip install --no-cache-dir --no-deps \
-        $(find . -name "*.whl") && \
+    pip install --no-cache-dir --no-deps $(find . -name "*.whl") && \
     pip install --no-cache-dir --no-deps . && \
-    cd / && \
-    rm -rf /tmp/sdk-build
+    cd / && rm -rf /tmp/sdk-build /var/tmp/vsphere_automation_sdk.tar.gz requirements.txt
+
+#=============================================================================
+# Configure Multiarch contexts with valid schema properties
+#=============================================================================
+RUN mkdir -p /root/.docker/buildx/instances && \
+    echo '{"name":"multiarch-builder","driver":"docker-container","nodes":[{"name":"multiarch-builder0","endpoint":"unix:///var/run/docker.sock","platforms":null,"flags":[],"env":null,"driver-opts":null}]}' \
+    > /root/.docker/buildx/instances/multiarch-builder && \
+    mkdir -p /root/.docker && \
+    echo '{"currentContext":"default"}' \
+    > /root/.docker/config.json
 
 # Create the default Ansible collections directory to ensure
 # `ansible-galaxy collection list` can run without errors.
@@ -228,7 +215,7 @@ RUN mkdir -p /root/.ansible/collections
 # optionally can set environment variables to customize retries and delay
 # ENV RETRY_MAX_ATTEMPTS=7
 # ENV RETRY_SLEEP_SECONDS=15
-RUN /usr/local/bin/retry_command.sh ansible-galaxy collection install -r requirements.yml
+RUN /usr/local/bin/retry_command.sh ansible-galaxy collection install -r requirements.yml && rm requirements.yml
 
 # Create a working directory for Ansible project files
 WORKDIR /ansible_project
