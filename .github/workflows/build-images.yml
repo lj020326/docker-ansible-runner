@@ -68,14 +68,14 @@ jobs:
         run: |
           # Extract branch name (e.g., 'v1' or 'develop-lj')
           BRANCH_NAME=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
-          
+
           # Base tags: branch name, SHA, build number, and date
           TAGS="${{ env.DOCKER_IMAGE }}:${BRANCH_NAME}"
           TAGS="$TAGS,${{ env.DOCKER_IMAGE }}:${{ matrix.versions.tag }}"
           TAGS="$TAGS,${{ env.DOCKER_IMAGE }}:${{ github.sha }}"
           TAGS="$TAGS,${{ env.DOCKER_IMAGE }}:build-${{ github.run_number }}"
           TAGS="$TAGS,${{ env.DOCKER_IMAGE }}:${{ steps.date.outputs.date }}"
-          
+
           echo "tags=$TAGS" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx

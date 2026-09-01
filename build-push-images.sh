@@ -24,9 +24,9 @@ for ANSIBLE_VER in "${ANSIBLE_VERSIONS[@]}"; do
     for PYTHON_VER in "${PYTHON_VERSIONS[@]}"; do
         # Construct the tag based on your naming convention
         TAG=""
-        if [ "${ANSIBLE_VER}" = "latest" ]; then
+        if [[ "${ANSIBLE_VER}" = "latest" ]]; then
             TAG="latest-py${PYTHON_VER}"
-        elif [ "${ANSIBLE_VER}" = "devel" ]; then
+        elif [[ "${ANSIBLE_VER}" = "devel" ]]; then
             TAG="devel-py${PYTHON_VER}"
         else
             TAG="stable-${ANSIBLE_VER}-py${PYTHON_VER}"
@@ -35,17 +35,18 @@ for ANSIBLE_VER in "${ANSIBLE_VERSIONS[@]}"; do
         FULL_IMAGE_NAME="${INTERNAL_REGISTRY}/${BASE_IMAGE_NAME}:${TAG}"
 
         echo "--- Building image: ${FULL_IMAGE_NAME} (Ansible: ${ANSIBLE_VER}, Python: ${PYTHON_VER}) ---"
-        # Build the Docker image, passing versions as build arguments
-        docker build \
-            --build-arg ANSIBLE_CORE_VERSION="${ANSIBLE_VER}" \
-            --build-arg PYTHON_VERSION="${PYTHON_VER}" \
-            -t "${FULL_IMAGE_NAME}" \
-            "${DOCKERFILE_PATH}"
 
-        if [ $? -eq 0 ]; then
+        DOCKER_CMD="docker build \
+            --build-arg ANSIBLE_CORE_VERSION=${ANSIBLE_VER} \
+            --build-arg PYTHON_VERSION=${PYTHON_VER} \
+            -t ${FULL_IMAGE_NAME} \
+            ${DOCKERFILE_PATH}"
+
+        # Build the Docker image, passing versions as build arguments
+        if "${DOCKER_CMD}"; then
+
             echo "--- Successfully built ${FULL_IMAGE_NAME}. Pushing to registry... ---"
-            docker push "${FULL_IMAGE_NAME}"
-            if [ $? -eq 0 ]; then
+            if docker push "${FULL_IMAGE_NAME}"; then
                 echo "--- Successfully pushed ${FULL_IMAGE_NAME} ---"
             else
                 echo "!!! Failed to push ${FULL_IMAGE_NAME} !!!"

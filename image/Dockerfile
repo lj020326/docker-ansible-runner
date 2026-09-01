@@ -15,6 +15,7 @@ ARG GOVC_VERSION=v0.53.1
 ARG PACKER_VERSION=1.15.3
 ARG INCLUSIVITY_VERSION=0.19.0
 
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends unzip tar curl \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /out/usr/local/bin
@@ -64,17 +65,18 @@ ARG uid=1001
 ARG gid=1001
 ARG DOCKER_GID=1102
 
-# Setup Docker Group, Jenkins User, and APT Configuration
-RUN groupadd -g ${DOCKER_GID} docker && \
-    groupadd -g ${gid} ${group} && \
-    useradd -l -c "Jenkins user" --shell /bin/bash -d /home/"${user}" -u "${uid}" -g "${gid}" -m "${user}" && \
-    usermod -aG sudo,docker ${user} && \
-    echo 'APT::Install-Suggests "0";\nAPT::Install-Recommends "0";' > /etc/apt/apt.conf.d/00-docker
+# Switch default shell to bash so pipefail is recognized globally across RUN statements
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Switch default shell to bash so pipefail is recognized
-SHELL ["/bin/bash", "-c"]
+# Setup Docker Group, Jenkins User, and APT Configuration
+RUN groupadd -g "${DOCKER_GID}" docker && \
+    groupadd -g "${gid}" "${group}" && \
+    useradd -l -c "Jenkins user" --shell /bin/bash -d /home/"${user}" -u "${uid}" -g "${gid}" -m "${user}" && \
+    usermod -aG sudo,docker "${user}" && \
+    printf 'APT::Install-Suggests "0";\nAPT::Install-Recommends "0";\n' > /etc/apt/apt.conf.d/00-docker
 
 # Combined APT Installation Layer
+# hadolint ignore=DL3008
 RUN set -o pipefail && \
     apt-get update -qqy && \
     apt-get -qqy --no-install-recommends install \
@@ -98,7 +100,7 @@ RUN set -o pipefail && \
     install -m 0755 -d /etc/apt/keyrings && \
     curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
     chmod a+r /etc/apt/keyrings/docker.gpg && \
-    echo "deb [arch=\"$(dpkg --print-architecture)\" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" > /etc/apt/sources.list.d/docker.list && \
+    echo "deb [arch=\"$(dpkg --print-architecture)\" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(. /etc/os-release && echo "\"$VERSION_CODENAME\"") stable" > /etc/apt/sources.list.d/docker.list && \
     apt-get update && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin docker-buildx-plugin docker-model-plugin && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
@@ -109,15 +111,17 @@ COPY --from=builder /out/usr/local/bin/ /usr/local/bin/
 
 # Setup Virtual Environment and Python packages
 WORKDIR /tmp
-RUN python3 -m venv $VIRTUAL_ENV && pip install --no-cache-dir --upgrade pip wheel setuptools
+# hadolint ignore=DL3013
+RUN python3 -m venv "$VIRTUAL_ENV" && pip install --no-cache-dir --upgrade pip wheel setuptools
 
 RUN echo "Install ansible-core with ANSIBLE_CORE_VERSION: ${ANSIBLE_CORE_VERSION}"
 
 # Install ansible-core and ansible-test.
 # ansible-test is included as part of the ansible-core package.
 # Use the specified ANSIBLE_CORE_VERSION.
-#RUN pip install --user --upgrade pip \
-RUN pip install --disable-pip-version-check --upgrade pip \
+# hadolint ignore=DL3013
+RUN set -o pipefail && \
+    pip install --disable-pip-version-check --upgrade pip \
     && case "${ANSIBLE_CORE_VERSION}" in \
         latest) \
             pip install "ansible-core"; \
@@ -128,8 +132,6 @@ RUN pip install --disable-pip-version-check --upgrade pip \
             # installing the latest published ansible-core.
 #            set -x; \
             python -m pip install " https://github.com/ansible/ansible/archive/devel.tar.gz" --disable-pip-version-check --user; \
-#            pip install "ansible-core"; \
-#            set +x; \
             ;; \
         *) \
             # Use compatible release operator to get the latest patch version for a given minor version (e.g., 2.14.x)
@@ -138,39 +140,35 @@ RUN pip install --disable-pip-version-check --upgrade pip \
                 echo "Error: ANSIBLE_CORE_VERSION is empty for compatible release installation."; \
                 exit 1; \
             fi; \
-#            set -x; \
-#            python -m pip install " https://github.com/ansible/ansible/archive/stable-${ANSIBLE_CORE_VERSION}.tar.gz" --disable-pip-version-check --user; \
-#            pip install "ansible-core~=${ANSIBLE_CORE_VERSION}"; \
             MAJOR_MINOR=$(echo "${ANSIBLE_CORE_VERSION}" | cut -d. -f1,2); \
             NEXT_MINOR=$(echo "${ANSIBLE_CORE_VERSION}" | awk -F. '{print $2 + 1}'); \
             UPPER_BOUND="${MAJOR_MINOR%.*}.${NEXT_MINOR}"; \
             pip install --disable-pip-version-check "ansible-core>=${ANSIBLE_CORE_VERSION},<${UPPER_BOUND}"; \
-#            set +x; \
             ;; \
     esac \
     && pip install --disable-pip-version-check pytest flake8
-#    && pip install --user pytest flake8
 
 ARG VSPHERE_AUTOMATION_SDK_VERSION=8.0.3.0
 COPY requirements.txt .
 ADD files/vsphere_automation_sdk-${VSPHERE_AUTOMATION_SDK_VERSION}.tar.gz /tmp/sdk-build/
 
+# hadolint ignore=DL3013
 RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir --no-deps $(find . -name "*.whl") && \
+    find . -name "*.whl" -exec pip install --no-cache-dir --no-deps {} + && \
     pip install --no-cache-dir --no-deps /tmp/sdk-build/* && \
     rm -rf /tmp/sdk-build requirements.txt
 
 # Configure Multiarch Contexts
-RUN for user_home in /root /home/${user}; do \
-        mkdir -p ${user_home}/.ssh && \
-        mkdir -p ${user_home}/.docker/buildx/instances && \
+RUN for user_home in /root "/home/${user}"; do \
+        mkdir -p "${user_home}/.ssh" && \
+        mkdir -p "${user_home}/.docker/buildx/instances" && \
         echo '{"name":"multiarch-builder","driver":"docker-container","nodes":[{"name":"multiarch-builder0","endpoint":"unix:///var/run/docker.sock","platforms":null,"flags":[],"env":null,"driver-opts":null}]}' \
-        > ${user_home}/.docker/buildx/instances/multiarch-builder && \
-        mkdir -p ${user_home}/.docker && \
+        > "${user_home}/.docker/buildx/instances/multiarch-builder" && \
+        mkdir -p "${user_home}/.docker" && \
         echo '{"currentContext":"default"}' \
-        > ${user_home}/.docker/config.json && \
-        mkdir -p ${user_home}/.ansible/collections && \
-        chown -R ${user}:${user} ${user_home}/.docker ${user_home}/.ansible || true; \
+        > "${user_home}/.docker/config.json" && \
+        mkdir -p "${user_home}/.ansible/collections" && \
+        chown -R "${user}:${user}" "${user_home}/.docker" "${user_home}/.ansible" || true; \
     done
 
 ENV HOME=/home/${user}
