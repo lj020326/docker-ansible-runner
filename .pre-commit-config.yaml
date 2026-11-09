@@ -10,6 +10,7 @@ repos:
       - id: check-json
       - id: check-added-large-files
         args: ['--maxkb=1024']
+        exclude: (^|/)files/
       - id: check-merge-conflict
       - id: check-executables-have-shebangs
       - id: check-shebang-scripts-are-executable
@@ -40,6 +41,7 @@ repos:
       - id: yamllint
         args: [-c, .yamllint]
         types: [yaml]
+        exclude: (^|/)archive/
 
 #  # Shell Script Linting (for build-push-images.sh & retry_command.sh)
 #  - repo: https://github.com/koalaman/shellcheck-precommit

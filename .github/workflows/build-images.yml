@@ -27,12 +27,16 @@ jobs:
 #      max-parallel: 2
       matrix:
         versions:
+          - { python: "3.14", ansible: "2.22", tag: "stable-2.22-py3.14" }
           - { python: "3.14", ansible: "2.21", tag: "stable-2.21-py3.14" }
           - { python: "3.14", ansible: "2.20", tag: "stable-2.20-py3.14" }
 #          - { python: "3.14", ansible: "2.19", tag: "stable-2.19-py3.14" }
 #          - { python: "3.14", ansible: "devel", tag: "devel-py3.14" }
+          - { python: "3.13", ansible: "2.22", tag: "stable-2.22-py3.13" }
+          - { python: "3.13", ansible: "2.21", tag: "stable-2.21-py3.13" }
           - { python: "3.13", ansible: "2.20", tag: "stable-2.20-py3.13" }
           - { python: "3.13", ansible: "2.19", tag: "stable-2.19-py3.13" }
+          - { python: "3.12", ansible: "2.21", tag: "stable-2.21-py3.12" }
           - { python: "3.12", ansible: "2.20", tag: "stable-2.20-py3.12" }
           - { python: "3.12", ansible: "2.19", tag: "stable-2.19-py3.12" }
           - { python: "3.12", ansible: "2.16", tag: "stable-2.16-py3.12" }

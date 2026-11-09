@@ -9,7 +9,7 @@ The ansible enabled docker image used in examples here can be found on [dockerhu
 
 Running Ansible in Docker makes a lot of sense: its super quick to get going, and you can just expose the ports needed to access via the web interface. But it also makes sense to run your ansible playbooks inside Docker as well: its compartmentalised, with full control of the environment inside.
 
-## Status
+## CI Status
 
 [![GitHub issues](https://img.shields.io/github/issues/lj020326/docker-ansible-runner.svg?style=flat)](https://github.com/lj020326/docker-ansible-runner/issues)
 [![GitHub stars](https://img.shields.io/github/stars/lj020326/docker-ansible-runner.svg?style=flat)](https://github.com/lj020326/docker-ansible-runner/stargazers)

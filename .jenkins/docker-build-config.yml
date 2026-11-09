@@ -59,11 +59,6 @@ buildImageList:
       PYTHON_VERSION: "3.12"
     buildTags:
       - stable-2.21-py3.12
-  - buildArgs:
-      ANSIBLE_CORE_VERSION: "latest"
-      PYTHON_VERSION: "3.12"
-    buildTags:
-      - latest-py3.12
 
   ## python: 3.13
   - buildArgs:
@@ -81,6 +76,11 @@ buildImageList:
       PYTHON_VERSION: "3.13"
     buildTags:
       - stable-2.21-py3.13
+  - buildArgs:
+      ANSIBLE_CORE_VERSION: "2.22"
+      PYTHON_VERSION: "3.13"
+    buildTags:
+      - stable-2.22-py3.13
   - buildArgs:
       ANSIBLE_CORE_VERSION: "latest"
       PYTHON_VERSION: "3.13"
@@ -103,6 +103,11 @@ buildImageList:
       PYTHON_VERSION: "3.14"
     buildTags:
       - stable-2.21-py3.14
+  - buildArgs:
+      ANSIBLE_CORE_VERSION: "2.22"
+      PYTHON_VERSION: "3.14"
+    buildTags:
+      - stable-2.22-py3.14
   - buildArgs:
       ANSIBLE_CORE_VERSION: "latest"
       PYTHON_VERSION: "3.14"
